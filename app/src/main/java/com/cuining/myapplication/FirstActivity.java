@@ -16,9 +16,13 @@ import com.meb.tracker.TrackerSDK;
 import com.meb.tracker.aop.ActivityTrace;
 import com.meb.tracker.aop.ClickTrace;
 import com.meb.tracker.aop.NavigationTrace;
+import com.meb.tracker.net.CollectBody;
 
 import java.util.ArrayList;
 
+/**
+ * Activity添加注解（暂时不支持fragment）
+ */
 @ActivityTrace(pageId = "111")
 public class FirstActivity extends AppCompatActivity {
 
@@ -53,6 +57,12 @@ public class FirstActivity extends AppCompatActivity {
 //                    }
 //                }
 //        ).start();
+
+        CollectBody collectBody = TrackerSDK.getInstance().creatCommonCollect();
+        //修改collectBody值
+        //collectBody.setFrom("XXX");
+
+        TrackerSDK.getInstance().addCustomTracker(collectBody);
     }
 
 

@@ -1,14 +1,18 @@
 package com.meb.tracker;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -35,6 +39,12 @@ public class TrackerSDK {
 
     private long startTime;
 
+    public int count = 0;//判断前后台用
+
+    private Handler handler;
+    private Runnable runnable;
+    private boolean isSendExit;
+
 
     public static synchronized TrackerSDK getInstance() {
         if (trackerSDK == null) {
@@ -50,6 +60,46 @@ public class TrackerSDK {
         initCommonInfo(application, appId);
         initPageChange(application);
         TrackerManager.getInstance().init();
+        initHandler();
+    }
+
+    @SuppressLint("HandlerLeak")
+    private void initHandler() {
+        handler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                //结束任务
+                ActivityInfo lastActivityInfo = AppManager.getAppManager().getLastActivityInfo();
+                if (lastActivityInfo != null) {
+                    Log.i("Tracker:", "页面id：" + lastActivityInfo.getPageId() + "  path:" + lastActivityInfo.getPath());
+                    Log.i("Tracker:", "上一个页面id：" + lastActivityInfo.getFromPageId() + "  path:" + lastActivityInfo.getFromPath());
+
+                    CollectBody collectBody = creatCommonCollect();
+                    collectBody.setPageId(lastActivityInfo.getPageId());
+                    collectBody.setPageUrl(lastActivityInfo.getPath());
+                    collectBody.setFrom(lastActivityInfo.getFromPageId());
+                    collectBody.setIsExitApp(lastActivityInfo.getPageId() == null);
+                    collectBody.setEventTime(String.valueOf(System.currentTimeMillis()));
+                    collectBody.setUserDuration(System.currentTimeMillis() - startTime);
+                    collectBody.setPageDuration(System.currentTimeMillis() - lastActivityInfo.getTime());
+                    collectBody.setIsExitApp(true);
+                    TrackerManager.getInstance().addCollect(collectBody);
+                    Log.i("Tracker:添加页面跳转事件", collectBody.toString());
+
+                }
+
+                Activity currentActivity = AppManager.getAppManager().currentActivity();
+                AppManager.getAppManager().setLastActivityInfo(new ActivityInfo(
+                        null,
+                        null,
+                        currentActivity == null ? null : currentActivity.getClass().getAnnotation(ActivityTrace.class).pageId(),
+                        currentActivity == null ? null : currentActivity.getClass().getName(),
+                        System.currentTimeMillis()));
+
+                isSendExit = true;
+            }
+        };
     }
 
     private void initPageChange(Application application) {
@@ -64,6 +114,13 @@ public class TrackerSDK {
 
             @Override
             public void onActivityStarted(Activity activity) {
+                if (count == 0) {
+                    handler.removeCallbacks(runnable);
+                    if (isSendExit) {
+                        startTime = System.currentTimeMillis();
+                    }
+                }
+                count++;
 
             }
 
@@ -79,7 +136,10 @@ public class TrackerSDK {
 
             @Override
             public void onActivityStopped(Activity activity) {
-
+                count--;
+                if (count == 0) {
+                    startEndEvent();
+                }
             }
 
             @Override
@@ -97,6 +157,18 @@ public class TrackerSDK {
         });
 
 
+    }
+
+    private void startEndEvent() {
+        runnable = new Runnable() {
+            @Override
+            public void run() {
+                Message message = handler.obtainMessage();
+                message.what = 1;
+                handler.handleMessage(message);
+            }
+        };
+        handler.postDelayed(runnable, 30000);
     }
 
 
