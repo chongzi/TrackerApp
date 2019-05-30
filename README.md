@@ -47,7 +47,8 @@ TrackerSDK.getInstance().setUserId("登录的userid”);
 ### Step 5. Activity add annotation or event add annotation
 ```
 /**
- * Activity添加注解（暂时不支持fragment）
+ * Activity添加注解ActivityTrace（暂时不支持fragment）
+ * 方法点添加注解ClickTrace
  */
 @ActivityTrace(pageId = "页面id")
 public class FirstActivity extends AppCompatActivity {
